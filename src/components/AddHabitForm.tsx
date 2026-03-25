@@ -4,9 +4,25 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const COLORS = [
   "#e8614d", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899",
+  "#f43f5e", "#0ea5e9", "#22c55e", "#a855f7", "#fb923c", "#14b8a6",
 ];
 
-const ICONS = ["🏃", "📖", "💧", "🧘", "💪", "🎯", "✍️", "🛏️", "🍎", "🧠"];
+const EMOJI_CATEGORIES = {
+  "Sports & Fitness": ["🏃", "💪", "🏋️", "🤸", "🧘", "🚴", "⛹️", "🤾", "🏊", "🤺", "⛷️", "🏄", "🚣", "🏇"],
+  "Study & Learning": ["📖", "📚", "✍️", "🎓", "📝", "🧠", "💡", "🔬", "🎨", "🎭", "🎬", "🎵", "🎸", "🎹"],
+  "Health & Wellness": ["💧", "🍎", "🥗", "🧘", "🛏️", "🏥", "💊", "🫀", "📊", "⚖️", "🏃", "🚴", "🧪"],
+  "Food & Nutrition": ["🍎", "🥕", "🥦", "🍊", "🍌", "🥑", "🥛", "🍯", "🥤", "☕", "🍵", "🧂", "🍽️"],
+  "Work & Productivity": ["💼", "📊", "📈", "💻", "🖥️", "📱", "⏰", "✅", "📋", "📌", "🎯", "🚀", "⚙️"],
+  "Creative": ["🎨", "🖌️", "🖍️", "✏️", "📐", "🎭", "🎬", "📷", "📸", "🎥", "🎞️", "🎪", "🎨"],
+  "Mindfulness": ["🧘", "🕉️", "☮️", "💆", "🛀", "🌸", "🌺", "🌻", "🌷", "🌹", "🍃", "🌿", "☘️"],
+  "Goals & Achievements": ["🎯", "🏆", "🥇", "🥈", "🥉", "🎖️", "👑", "💎", "⭐", "✨", "🌟", "💫", "🚀"],
+  "Fun & Hobbies": ["🎮", "🎲", "🎯", "🎪", "🎭", "🎨", "🎬", "🎤", "🎧", "🎸", "🎹", "🎺", "🎻"],
+  "Nature": ["🌱", "🌿", "🍀", "🌳", "🌲", "🌴", "🌵", "🌾", "🌻", "🌺", "🌸", "🌷", "🌹", "🌼"],
+  "Animals": ["🐕", "🐈", "🐇", "🦆", "🦅", "🦉", "🐢", "🐌", "🐝", "🦋", "🐛", "🐞", "🦗"],
+  "Daily Habits": ["🛏️", "🚿", "🪥", "👕", "👟", "🧴", "🧼", "🧽", "🧹", "🧺", "🧻", "📅"]
+};
+
+const ALL_ICONS = Object.values(EMOJI_CATEGORIES).flat();
 
 interface AddHabitFormProps {
   onAdd: (name: string, color: string, icon: string) => void;
@@ -16,7 +32,8 @@ const AddHabitForm = ({ onAdd }: AddHabitFormProps) => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [color, setColor] = useState(COLORS[0]);
-  const [icon, setIcon] = useState(ICONS[0]);
+  const [icon, setIcon] = useState(ALL_ICONS[0]);
+  const [selectedCategory, setSelectedCategory] = useState("Sports & Fitness");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,15 +63,32 @@ const AddHabitForm = ({ onAdd }: AddHabitFormProps) => {
             />
 
             <div className="mt-3">
-              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Icon</p>
-              <div className="flex flex-wrap gap-1.5">
-                {ICONS.map((i) => (
+              <p className="mb-2 text-xs font-medium text-muted-foreground">Categories</p>
+              <div className="mb-3 flex flex-wrap gap-1">
+                {Object.keys(EMOJI_CATEGORIES).map((category) => (
+                  <button
+                    type="button"
+                    key={category}
+                    onClick={() => setSelectedCategory(category)}
+                    className={`rounded-md px-2 py-1 text-xs transition-all ${
+                      selectedCategory === category
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                    }`}
+                  >
+                    {category}
+                  </button>
+                ))}
+              </div>
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">Select Icon</p>
+              <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto rounded-md border border-border bg-background p-2">
+                {EMOJI_CATEGORIES[selectedCategory as keyof typeof EMOJI_CATEGORIES]?.map((i) => (
                   <button
                     type="button"
                     key={i}
                     onClick={() => setIcon(i)}
                     className={`flex h-8 w-8 items-center justify-center rounded-md text-base transition-all ${
-                      icon === i ? "ring-2 ring-ring scale-110" : "hover:bg-secondary"
+                      icon === i ? "ring-2 ring-ring scale-110 bg-secondary" : "hover:bg-secondary"
                     }`}
                   >
                     {i}
