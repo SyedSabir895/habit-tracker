@@ -50,8 +50,13 @@ const HabitCard = ({
       <div className="flex items-center gap-3">
         <button
           onClick={onToggle}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg transition-transform active:scale-90"
-          style={{ backgroundColor: completed ? color : undefined }}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-lg transition-all active:scale-90 hover:scale-110 cursor-pointer"
+          style={{ 
+            backgroundColor: completed ? color : undefined,
+            borderWidth: completed ? 0 : 2,
+            borderColor: completed ? undefined : "currentColor",
+            borderStyle: completed ? undefined : "solid"
+          }}
           aria-label={completed ? "Mark incomplete" : "Mark complete"}
         >
           {completed ? (
@@ -64,11 +69,13 @@ const HabitCard = ({
               <Check size={20} strokeWidth={3} />
             </motion.div>
           ) : (
-            <span
-              className="flex h-full w-full items-center justify-center rounded-lg border-2 border-border text-base"
+            <motion.span
+              initial={{ scale: 1 }}
+              animate={{ scale: 1 }}
+              className="flex h-full w-full items-center justify-center rounded-lg text-base"
             >
               {icon}
-            </span>
+            </motion.span>
           )}
         </button>
 

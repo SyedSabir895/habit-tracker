@@ -2,7 +2,15 @@ import { useMemo, useEffect, useState } from "react";
 import { Zap, Sun, Moon } from "lucide-react";
 import HabitCard from "@/components/HabitCard";
 import AddHabitForm from "@/components/AddHabitForm";
-import { useHabits } from "@/hooks/useHabits";
+import { supabase } from "../supabaseClient";
+
+interface Habit {
+  id: number;
+  habit_name: string;
+  completed: boolean;
+  icon: string | null;
+  color: string | null;
+}
 
 const QUOTES = [
   "We are what we repeatedly do. Excellence is not an act, but a habit.",
@@ -18,7 +26,7 @@ const QUOTES = [
 ];
 
 const Index = () => {
-  const { habits, addHabit, deleteHabit, toggleToday, isCompletedToday, getStreak, getTotalCompletions, getWeekData } = useHabits();
+  const [habits, setHabits] = useState<Habit[]>([]);
 
   const [dark, setDark] = useState(() => {
     if (typeof window !== "undefined") {
@@ -27,17 +35,73 @@ const Index = () => {
     return false;
   });
 
+  // 🌙 Theme toggle
   useEffect(() => {
     document.documentElement.classList.toggle("dark", dark);
     localStorage.setItem("theme", dark ? "dark" : "light");
   }, [dark]);
 
+  // 📥 Fetch habits from Supabase
+  useEffect(() => {
+    fetchHabits();
+  }, []);
+
+  const fetchHabits = async () => {
+    const { data, error } = await supabase
+      .from("habits")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.log("Fetch Error:", error);
+    } else {
+      setHabits(data);
+    }
+  };
+
+  // ➕ Add habit
+  const addHabit = async (name: string, color: string, icon: string) => {
+    const { error } = await supabase.from("habits").insert([
+      {
+        habit_name: name,
+        color,
+        icon,
+        completed: false,
+        date: new Date().toISOString().split("T")[0],
+      },
+    ]);
+
+    if (error) console.log("Insert Error:", error);
+    else fetchHabits();
+  };
+
+  // ❌ Delete habit
+  const deleteHabit = async (id) => {
+    const { error } = await supabase.from("habits").delete().eq("id", id);
+
+    if (error) console.log("Delete Error:", error);
+    else fetchHabits();
+  };
+
+  // ✅ Toggle complete
+  const toggleToday = async (id, currentStatus) => {
+    const { error } = await supabase
+      .from("habits")
+      .update({ completed: !currentStatus })
+      .eq("id", id);
+
+    if (error) console.log("Update Error:", error);
+    else fetchHabits();
+  };
+
+  // 📊 Quote logic
   const quote = useMemo(() => {
     const day = Math.floor(Date.now() / 86400000);
     return QUOTES[day % QUOTES.length];
   }, []);
 
-  const completedToday = habits.filter((h) => isCompletedToday(h.id)).length;
+  // 📊 Progress calculation
+  const completedToday = habits.filter((h) => h.completed).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -55,7 +119,6 @@ const Index = () => {
           <button
             onClick={() => setDark(!dark)}
             className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary"
-            aria-label="Toggle theme"
           >
             {dark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
@@ -72,32 +135,34 @@ const Index = () => {
             <div className="h-2 w-full overflow-hidden rounded-full bg-chart-empty">
               <div
                 className="h-full rounded-full bg-primary transition-all duration-500"
-                style={{ width: `${(completedToday / habits.length) * 100}%` }}
+                style={{
+                  width: `${(completedToday / habits.length) * 100}%`,
+                }}
               />
             </div>
           </div>
         )}
 
-        {/* Habits */}
+        {/* Habits List */}
         <div className="mb-4 flex flex-col gap-3">
           {habits.map((habit, i) => (
             <HabitCard
               key={habit.id}
-              name={habit.name}
-              icon={habit.icon}
-              color={habit.color}
-              completed={isCompletedToday(habit.id)}
-              streak={getStreak(habit.id)}
-              total={getTotalCompletions(habit.id)}
-              weekData={getWeekData(habit.id)}
-              onToggle={() => toggleToday(habit.id)}
+              name={habit.habit_name}
+              icon={habit.icon ?? "🎯"}
+              color={habit.color ?? "#3b82f6"}
+              completed={habit.completed}
+              streak={0}
+              total={0}
+              weekData={[]}
+              onToggle={() => toggleToday(habit.id, habit.completed)}
               onDelete={() => deleteHabit(habit.id)}
               index={i}
             />
           ))}
         </div>
 
-        {/* Add form */}
+        {/* Add Habit */}
         <AddHabitForm onAdd={addHabit} />
 
         {habits.length === 0 && (
