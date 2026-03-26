@@ -11,6 +11,20 @@ interface Habit {
   completed: boolean;
   icon: string | null;
   color: string | null;
+  date?: string | null;
+}
+
+interface HabitLog {
+  habit_id: number;
+  date: string;
+  completed: boolean;
+}
+
+interface DailyProgress {
+  date: string;
+  completed: number;
+  total: number;
+  percent: number;
 }
 
 const QUOTES = [
@@ -29,6 +43,15 @@ const QUOTES = [
 const Index = () => {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [dailyProgress, setDailyProgress] = useState<DailyProgress[]>([]);
+  const getToday = () => new Date().toISOString().split("T")[0];
+  const getPastDays = (days: number) => {
+    return Array.from({ length: days }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (days - 1 - i));
+      return date.toISOString().split("T")[0];
+    });
+  };
 
   const [dark, setDark] = useState(() => {
     if (typeof window !== "undefined") {
@@ -49,13 +72,60 @@ const Index = () => {
   }, []);
 
   const fetchHabits = async () => {
+    const today = getToday();
+    const weekDates = getPastDays(7);
+    const weekStart = weekDates[0];
+
     const primaryQuery = await supabase
       .from("habits")
       .select("*")
       .order("created_at", { ascending: false });
 
     if (!primaryQuery.error) {
-      setHabits((primaryQuery.data ?? []) as Habit[]);
+      const baseHabits = (primaryQuery.data ?? []) as Habit[];
+      const { data: todayLogs, error: logsError } = await supabase
+        .from("habit_logs")
+        .select("habit_id, date, completed")
+        .eq("date", today);
+      const { data: weekLogs } = await supabase
+        .from("habit_logs")
+        .select("habit_id, date, completed")
+        .gte("date", weekStart)
+        .lte("date", today)
+        .eq("completed", true);
+
+      if (logsError) {
+        setHabits(baseHabits);
+        setDailyProgress([]);
+        setFetchError(null);
+        return;
+      }
+
+      const completedByHabit = new Map(
+        ((todayLogs ?? []) as HabitLog[]).map((log) => [log.habit_id, log.completed])
+      );
+      const habitsWithTodayStatus = baseHabits.map((habit) => ({
+        ...habit,
+        completed: completedByHabit.get(habit.id) ?? false,
+      }));
+      const progressByDate = new Map<string, Set<number>>();
+      weekDates.forEach((date) => progressByDate.set(date, new Set<number>()));
+      ((weekLogs ?? []) as HabitLog[]).forEach((log) => {
+        const set = progressByDate.get(log.date);
+        if (set) set.add(log.habit_id);
+      });
+      const weekProgress = weekDates.map((date) => {
+        const completed = progressByDate.get(date)?.size ?? 0;
+        const total = baseHabits.length;
+        return {
+          date,
+          completed,
+          total,
+          percent: total > 0 ? Math.round((completed / total) * 100) : 0,
+        };
+      });
+      setHabits(habitsWithTodayStatus);
+      setDailyProgress(weekProgress);
       setFetchError(null);
       return;
     }
@@ -73,7 +143,50 @@ const Index = () => {
       return;
     }
 
-    setHabits((fallbackQuery.data ?? []) as Habit[]);
+    const fallbackHabits = (fallbackQuery.data ?? []) as Habit[];
+    const { data: todayLogs, error: logsError } = await supabase
+      .from("habit_logs")
+      .select("habit_id, date, completed")
+      .eq("date", today);
+
+    if (logsError) {
+      setHabits(fallbackHabits);
+      setDailyProgress([]);
+      setFetchError(null);
+      return;
+    }
+
+    const completedByHabit = new Map(
+      ((todayLogs ?? []) as HabitLog[]).map((log) => [log.habit_id, log.completed])
+    );
+    const habitsWithTodayStatus = fallbackHabits.map((habit) => ({
+      ...habit,
+      completed: completedByHabit.get(habit.id) ?? false,
+    }));
+    const { data: weekLogs } = await supabase
+      .from("habit_logs")
+      .select("habit_id, date, completed")
+      .gte("date", weekStart)
+      .lte("date", today)
+      .eq("completed", true);
+    const progressByDate = new Map<string, Set<number>>();
+    weekDates.forEach((date) => progressByDate.set(date, new Set<number>()));
+    ((weekLogs ?? []) as HabitLog[]).forEach((log) => {
+      const set = progressByDate.get(log.date);
+      if (set) set.add(log.habit_id);
+    });
+    const weekProgress = weekDates.map((date) => {
+      const completed = progressByDate.get(date)?.size ?? 0;
+      const total = fallbackHabits.length;
+      return {
+        date,
+        completed,
+        total,
+        percent: total > 0 ? Math.round((completed / total) * 100) : 0,
+      };
+    });
+    setHabits(habitsWithTodayStatus);
+    setDailyProgress(weekProgress);
     setFetchError(null);
   };
 
@@ -103,13 +216,29 @@ const Index = () => {
 
   // ✅ Toggle complete
   const toggleToday = async (id, currentStatus) => {
+    const today = getToday();
+    const nextStatus = !currentStatus;
+    const { error: logError } = await supabase.from("habit_logs").upsert(
+      {
+        habit_id: id,
+        date: today,
+        completed: nextStatus,
+      },
+      { onConflict: "habit_id,date" }
+    );
+
+    if (logError) {
+      console.log("Log Update Error:", logError);
+      return;
+    }
+
     const { error } = await supabase
       .from("habits")
-      .update({ completed: !currentStatus })
+      .update({ completed: nextStatus, date: today })
       .eq("id", id);
 
     if (error) console.log("Update Error:", error);
-    else fetchHabits();
+    fetchHabits();
   };
 
   // 📊 Quote logic
@@ -181,6 +310,38 @@ const Index = () => {
                   width: `${(completedToday / habits.length) * 100}%`,
                 }}
               />
+            </div>
+          </motion.div>
+        )}
+
+        {/* Weekly bar chart */}
+        {dailyProgress.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="mb-8 rounded-2xl border border-black/5 bg-white/70 p-5 shadow-sm dark:border-white/10 dark:bg-black/30"
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-foreground">Last 7 Days Progress</h2>
+              <p className="text-xs text-muted-foreground">Daily completed habits</p>
+            </div>
+            <div className="grid grid-cols-7 gap-3">
+              {dailyProgress.map((day) => (
+                <div key={day.date} className="flex flex-col items-center gap-2">
+                  <div className="flex h-28 w-full items-end rounded-xl bg-black/5 p-1 dark:bg-white/10">
+                    <div
+                      className="w-full rounded-lg bg-gradient-to-t from-indigo-500 to-purple-500 transition-all duration-500"
+                      style={{ height: `${Math.max(day.percent, day.percent > 0 ? 12 : 4)}%` }}
+                      title={`${day.completed}/${day.total} completed`}
+                    />
+                  </div>
+                  <p className="text-[10px] font-medium text-muted-foreground">
+                    {new Date(`${day.date}T12:00:00`).toLocaleDateString("en", { weekday: "short" })}
+                  </p>
+                  <p className="text-[10px] font-semibold text-foreground">{day.percent}%</p>
+                </div>
+              ))}
             </div>
           </motion.div>
         )}
