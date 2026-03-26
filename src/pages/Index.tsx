@@ -184,9 +184,6 @@ const Index = () => {
     const { error } = await supabase
       .from("habits")
       .update({ completed: nextStatus, date: today })
-    const { error } = await supabase
-      .from("habits")
-      .update({ completed: !currentStatus, date: today })
       .eq("id", id);
 
     if (error) console.log("Update Error:", error);
