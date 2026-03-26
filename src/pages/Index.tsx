@@ -11,6 +11,13 @@ interface Habit {
   completed: boolean;
   icon: string | null;
   color: string | null;
+  date?: string | null;
+}
+
+interface HabitLog {
+  habit_id: number;
+  date: string;
+  completed: boolean;
 }
 
 const QUOTES = [
@@ -29,6 +36,7 @@ const QUOTES = [
 const Index = () => {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const getToday = () => new Date().toISOString().split("T")[0];
 
   const [dark, setDark] = useState(() => {
     if (typeof window !== "undefined") {
@@ -49,13 +57,34 @@ const Index = () => {
   }, []);
 
   const fetchHabits = async () => {
+    const today = getToday();
+
     const primaryQuery = await supabase
       .from("habits")
       .select("*")
       .order("created_at", { ascending: false });
 
     if (!primaryQuery.error) {
-      setHabits((primaryQuery.data ?? []) as Habit[]);
+      const baseHabits = (primaryQuery.data ?? []) as Habit[];
+      const { data: todayLogs, error: logsError } = await supabase
+        .from("habit_logs")
+        .select("habit_id, date, completed")
+        .eq("date", today);
+
+      if (logsError) {
+        setHabits(baseHabits);
+        setFetchError(null);
+        return;
+      }
+
+      const completedByHabit = new Map(
+        ((todayLogs ?? []) as HabitLog[]).map((log) => [log.habit_id, log.completed])
+      );
+      const habitsWithTodayStatus = baseHabits.map((habit) => ({
+        ...habit,
+        completed: completedByHabit.get(habit.id) ?? false,
+      }));
+      setHabits(habitsWithTodayStatus);
       setFetchError(null);
       return;
     }
@@ -73,7 +102,26 @@ const Index = () => {
       return;
     }
 
-    setHabits((fallbackQuery.data ?? []) as Habit[]);
+    const fallbackHabits = (fallbackQuery.data ?? []) as Habit[];
+    const { data: todayLogs, error: logsError } = await supabase
+      .from("habit_logs")
+      .select("habit_id, date, completed")
+      .eq("date", today);
+
+    if (logsError) {
+      setHabits(fallbackHabits);
+      setFetchError(null);
+      return;
+    }
+
+    const completedByHabit = new Map(
+      ((todayLogs ?? []) as HabitLog[]).map((log) => [log.habit_id, log.completed])
+    );
+    const habitsWithTodayStatus = fallbackHabits.map((habit) => ({
+      ...habit,
+      completed: completedByHabit.get(habit.id) ?? false,
+    }));
+    setHabits(habitsWithTodayStatus);
     setFetchError(null);
   };
 
@@ -103,13 +151,29 @@ const Index = () => {
 
   // ✅ Toggle complete
   const toggleToday = async (id, currentStatus) => {
+    const today = getToday();
+    const nextStatus = !currentStatus;
+    const { error: logError } = await supabase.from("habit_logs").upsert(
+      {
+        habit_id: id,
+        date: today,
+        completed: nextStatus,
+      },
+      { onConflict: "habit_id,date" }
+    );
+
+    if (logError) {
+      console.log("Log Update Error:", logError);
+      return;
+    }
+
     const { error } = await supabase
       .from("habits")
-      .update({ completed: !currentStatus })
+      .update({ completed: nextStatus, date: today })
       .eq("id", id);
 
     if (error) console.log("Update Error:", error);
-    else fetchHabits();
+    fetchHabits();
   };
 
   // 📊 Quote logic
