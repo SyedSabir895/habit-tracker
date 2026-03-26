@@ -1,5 +1,6 @@
 import { useMemo, useEffect, useState } from "react";
 import { Zap, Sun, Moon } from "lucide-react";
+import { motion } from "framer-motion";
 import HabitCard from "@/components/HabitCard";
 import AddHabitForm from "@/components/AddHabitForm";
 import { supabase } from "../supabaseClient";
@@ -27,6 +28,7 @@ const QUOTES = [
 
 const Index = () => {
   const [habits, setHabits] = useState<Habit[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [dark, setDark] = useState(() => {
     if (typeof window !== "undefined") {
@@ -47,16 +49,32 @@ const Index = () => {
   }, []);
 
   const fetchHabits = async () => {
-    const { data, error } = await supabase
+    const primaryQuery = await supabase
       .from("habits")
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.log("Fetch Error:", error);
-    } else {
-      setHabits(data);
+    if (!primaryQuery.error) {
+      setHabits((primaryQuery.data ?? []) as Habit[]);
+      setFetchError(null);
+      return;
     }
+
+    // Fallback for tables that don't include created_at.
+    const fallbackQuery = await supabase
+      .from("habits")
+      .select("*")
+      .order("id", { ascending: false });
+
+    if (fallbackQuery.error) {
+      const message = fallbackQuery.error.message || primaryQuery.error.message;
+      console.error("Fetch Error:", fallbackQuery.error);
+      setFetchError(message);
+      return;
+    }
+
+    setHabits((fallbackQuery.data ?? []) as Habit[]);
+    setFetchError(null);
   };
 
   // ➕ Add habit
@@ -104,47 +122,71 @@ const Index = () => {
   const completedToday = habits.filter((h) => h.completed).length;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container max-w-lg py-8">
+    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-50 via-white to-purple-50 transition-colors duration-500 dark:from-slate-950 dark:via-purple-950/20 dark:to-slate-900">
+      <div className="container mx-auto max-w-5xl px-4 py-8">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
+        <motion.div 
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 flex items-center justify-between rounded-[2rem] border border-white/40 bg-white/60 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-md dark:border-white/10 dark:bg-black/40"
+        >
           <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold text-foreground">
-              <Zap className="text-primary" size={24} /> Habits
+            <h1 className="flex items-center gap-3 text-3xl font-extrabold tracking-tight text-foreground">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 text-white shadow-md shadow-indigo-500/20">
+                <Zap size={24} fill="currentColor" />
+              </span>
+              Habits
             </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {completedToday}/{habits.length} completed today
+            <p className="mt-2 font-medium text-muted-foreground">
+              <span className="text-indigo-500 font-bold dark:text-indigo-400">{completedToday}</span> / {habits.length} completed today
             </p>
           </div>
           <button
             onClick={() => setDark(!dark)}
-            className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-secondary"
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-white/80 text-muted-foreground shadow-sm ring-1 ring-black/5 transition-all hover:scale-110 hover:bg-white dark:bg-black/50 dark:ring-white/10 dark:hover:bg-black/80"
           >
-            {dark ? <Sun size={18} /> : <Moon size={18} />}
+            {dark ? <Sun size={20} className="text-amber-400" /> : <Moon size={20} className="text-indigo-500" />}
           </button>
-        </div>
+        </motion.div>
 
         {/* Quote */}
-        <div className="mb-6 rounded-lg bg-secondary p-4">
-          <p className="text-sm italic text-secondary-foreground">"{quote}"</p>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.1 }}
+          className="mb-8 relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-500 to-purple-600 p-6 text-white shadow-[0_8px_30px_rgba(99,102,241,0.2)]"
+        >
+          <div className="absolute -right-4 -top-4 opacity-10">
+            <Zap size={100} />
+          </div>
+          <p className="relative z-10 text-[15px] font-medium italic leading-relaxed text-white/90">"{quote}"</p>
+        </motion.div>
 
         {/* Progress bar */}
         {habits.length > 0 && (
-          <div className="mb-6">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-chart-empty">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2 }}
+            className="mb-8"
+          >
+            <div className="mb-3 flex justify-between text-sm font-bold text-muted-foreground px-1">
+              <span>Daily Progress</span>
+              <span className="text-indigo-500 dark:text-indigo-400">{Math.round((completedToday / habits.length) * 100)}%</span>
+            </div>
+            <div className="h-4 w-full overflow-hidden rounded-full bg-black/5 shadow-inner dark:bg-white/5">
               <div
-                className="h-full rounded-full bg-primary transition-all duration-500"
+                className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 shadow-[0_0_10px_rgba(99,102,241,0.5)] transition-all duration-1000 ease-out"
                 style={{
                   width: `${(completedToday / habits.length) * 100}%`,
                 }}
               />
             </div>
-          </div>
+          </motion.div>
         )}
 
         {/* Habits List */}
-        <div className="mb-4 flex flex-col gap-3">
+        <div className="mb-8 grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {habits.map((habit, i) => (
             <HabitCard
               key={habit.id}
@@ -164,6 +206,12 @@ const Index = () => {
 
         {/* Add Habit */}
         <AddHabitForm onAdd={addHabit} />
+
+        {fetchError && (
+          <p className="mt-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+            Unable to fetch habits: {fetchError}
+          </p>
+        )}
 
         {habits.length === 0 && (
           <p className="mt-8 text-center text-sm text-muted-foreground">

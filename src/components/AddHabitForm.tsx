@@ -48,18 +48,19 @@ const AddHabitForm = ({ onAdd }: AddHabitFormProps) => {
       <AnimatePresence>
         {open && (
           <motion.form
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="mb-4 overflow-hidden rounded-lg border border-border bg-card p-4"
+            initial={{ opacity: 0, height: 0, y: -20 }}
+            animate={{ opacity: 1, height: "auto", y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -20, scale: 0.95 }}
+            transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+            className="mb-6 overflow-hidden rounded-[2rem] border border-white/40 bg-white/80 p-6 shadow-xl backdrop-blur-xl dark:border-white/10 dark:bg-black/60"
             onSubmit={handleSubmit}
           >
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Habit name..."
+              placeholder="What do you want to build?"
               autoFocus
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full rounded-2xl border-none bg-black/5 px-5 py-4 text-lg font-bold text-foreground placeholder:text-muted-foreground/60 transition-all focus:bg-white focus:outline-none focus:ring-4 focus:ring-indigo-500/20 dark:bg-white/5 dark:focus:bg-black/50"
             />
 
             <div className="mt-3">
@@ -114,17 +115,17 @@ const AddHabitForm = ({ onAdd }: AddHabitFormProps) => {
               </div>
             </div>
 
-            <div className="mt-4 flex gap-2">
+            <div className="mt-6 flex gap-3">
               <button
                 type="submit"
-                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:opacity-90"
+                className="flex-1 rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-500 px-6 py-4 text-base font-bold text-white shadow-lg transition-all hover:scale-[1.02] hover:shadow-indigo-500/30 active:scale-95"
               >
-                Add Habit
+                Spark Habit ✨
               </button>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-md px-4 py-2 text-sm text-muted-foreground hover:bg-secondary"
+                className="rounded-2xl bg-black/5 px-8 py-4 text-base font-bold text-muted-foreground transition-all hover:bg-black/10 hover:text-foreground dark:bg-white/5 dark:hover:bg-white/10"
               >
                 Cancel
               </button>
@@ -134,12 +135,17 @@ const AddHabitForm = ({ onAdd }: AddHabitFormProps) => {
       </AnimatePresence>
 
       {!open && (
-        <button
+        <motion.button
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.98 }}
           onClick={() => setOpen(true)}
-          className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+          className="group flex w-full items-center justify-center gap-3 rounded-[2rem] border-2 border-dashed border-indigo-300 bg-indigo-50/50 py-5 text-base font-bold text-indigo-600 shadow-sm transition-all hover:border-indigo-400 hover:bg-indigo-100 hover:shadow-md dark:border-indigo-500/30 dark:bg-indigo-500/10 dark:text-indigo-400 dark:hover:border-indigo-500/50 dark:hover:bg-indigo-500/20"
         >
-          <Plus size={16} /> Add New Habit
-        </button>
+          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-indigo-200 text-indigo-700 transition-transform group-hover:scale-110 group-hover:rotate-90 dark:bg-indigo-900/50 dark:text-indigo-300">
+            <Plus size={24} strokeWidth={3} />
+          </div>
+          Create New Habit
+        </motion.button>
       )}
     </div>
   );
