@@ -11,6 +11,7 @@ interface Habit {
   completed: boolean;
   icon: string | null;
   color: string | null;
+  date?: string | null;
 }
 
 const QUOTES = [
@@ -29,6 +30,7 @@ const QUOTES = [
 const Index = () => {
   const [habits, setHabits] = useState<Habit[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const getToday = () => new Date().toISOString().split("T")[0];
 
   const [dark, setDark] = useState(() => {
     if (typeof window !== "undefined") {
@@ -48,7 +50,22 @@ const Index = () => {
     fetchHabits();
   }, []);
 
+  const resetHabitsForToday = async () => {
+    const today = getToday();
+    const { error } = await supabase
+      .from("habits")
+      .update({ completed: false, date: today })
+      .neq("date", today)
+      .eq("completed", true);
+
+    if (error) {
+      console.error("Daily reset error:", error);
+    }
+  };
+
   const fetchHabits = async () => {
+    await resetHabitsForToday();
+
     const primaryQuery = await supabase
       .from("habits")
       .select("*")
@@ -103,9 +120,10 @@ const Index = () => {
 
   // ✅ Toggle complete
   const toggleToday = async (id, currentStatus) => {
+    const today = getToday();
     const { error } = await supabase
       .from("habits")
-      .update({ completed: !currentStatus })
+      .update({ completed: !currentStatus, date: today })
       .eq("id", id);
 
     if (error) console.log("Update Error:", error);
