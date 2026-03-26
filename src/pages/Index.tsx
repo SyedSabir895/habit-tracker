@@ -56,8 +56,22 @@ const Index = () => {
     fetchHabits();
   }, []);
 
+  const resetHabitsForToday = async () => {
+    const today = getToday();
+    const { error } = await supabase
+      .from("habits")
+      .update({ completed: false, date: today })
+      .neq("date", today)
+      .eq("completed", true);
+
+    if (error) {
+      console.error("Daily reset error:", error);
+    }
+  };
+
   const fetchHabits = async () => {
     const today = getToday();
+    await resetHabitsForToday();
 
     const primaryQuery = await supabase
       .from("habits")
@@ -170,6 +184,9 @@ const Index = () => {
     const { error } = await supabase
       .from("habits")
       .update({ completed: nextStatus, date: today })
+    const { error } = await supabase
+      .from("habits")
+      .update({ completed: !currentStatus, date: today })
       .eq("id", id);
 
     if (error) console.log("Update Error:", error);
